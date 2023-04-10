@@ -233,7 +233,7 @@ class FollowTest(TestCase):
     def test_authorized_client_can_follow(self):
         """Проверяет что авторизованный клиент может подписаться"""
         Follow.objects.all().delete()
-        response = self.authorized_client.get(
+        self.authorized_client.get(
             reverse('posts:profile_follow', args=(self.author,))
         )
         self.assertEqual(Follow.objects.all().count(), 1)
@@ -241,7 +241,7 @@ class FollowTest(TestCase):
     def test_authorized_client_can_unfollow(self):
         """Проверяет что авторизованный клиент может отписаться"""
         self.assertEqual(Follow.objects.all().count(), 1)
-        response = self.authorized_client.get(
+        self.authorized_client.get(
             reverse('posts:profile_unfollow', args=(self.author,))
         )
         self.assertEqual(Follow.objects.all().count(), 0)
@@ -265,6 +265,3 @@ class FollowTest(TestCase):
         followings_second_not_follow = self.count_following_posts()
         self.assertEqual(followings_first_not_follow,
                          followings_second_not_follow)
-
-
-

@@ -114,4 +114,3 @@ class PostURLTests(TestCase):
         response = self.authorized_client.get('/unexistent/')
         self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
         self.assertTemplateUsed(response, 'core/404.html')
-
