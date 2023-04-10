@@ -1,0 +1,25 @@
+{% extends "includes/card.html" %}
+{% block title %}
+  {% if form.instance.pk %}Редактировать пост{% else %}Новый пост{% endif %}
+{% endblock %}
+{% block card-header %}
+  {% if form.instance.pk %}Редактировать пост{% else %}Новый пост{% endif %}
+{% endblock %}
+{% block card-body %}
+  {% include 'includes/errors.html' %}
+  <form method="post" enctype="multipart/form-data"
+    {% if form.instance.pk %}
+        action="{% url 'posts:post_edit' form.instance.pk %}"
+    {% else %}
+        action="{% url 'posts:post_create' %}"
+    {% endif %}
+  >
+    {% csrf_token %}
+    {% include 'includes/form_builder.html' %}
+    <div class="d-flex justify-content-end">
+      <button type="submit" class="btn btn-primary">
+        {% if form.instance.pk %}Сохранить{% else %}Добавить{% endif %}
+      </button>
+    </div>
+  </form>
+{% endblock %}
