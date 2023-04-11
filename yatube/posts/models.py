@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import models
+
 from core.models import PubDateModel
 
 User = get_user_model()
@@ -23,25 +24,14 @@ class Group(models.Model):
 
 
 class Post(PubDateModel):
-    text = models.TextField('Текст поста',
-                            help_text='Введите текст поста')
     group = models.ForeignKey(
         Group,
         on_delete=models.SET_NULL,
         blank=True,
         null=True,
-        related_name='posts',
         verbose_name='Группа',
         help_text='Группа, к которой будет относиться пост'
     )
-
-    author = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='posts',
-        verbose_name='Автор поста'
-    )
-
     image = models.ImageField(
         'Картинка',
         upload_to='posts/',
@@ -49,13 +39,10 @@ class Post(PubDateModel):
         help_text='Картинка к посту',
     )
 
-    class Meta:
+    class Meta(PubDateModel.Meta):
+        default_related_name = 'posts'
         verbose_name = 'Пост'
         verbose_name_plural = 'Посты'
-        ordering = ('-pub_date',)
-
-    def __str__(self):
-        return self.text[:settings.POST_TEXT_LENGTH]
 
 
 class Comment(PubDateModel):
@@ -66,23 +53,11 @@ class Comment(PubDateModel):
         verbose_name='Пост комментария',
         help_text='Пост, на котором будет оставлен комментарий'
     )
-    author = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='comments',
-        verbose_name='Автор комментария',
-        help_text='Пользователь, написавший комментарий'
-    )
-    text = models.TextField('Текст комментария',
-                            help_text='Введите текст комментария')
 
-    class Meta:
+    class Meta(PubDateModel.Meta):
+        default_related_name = 'comments'
         verbose_name = 'Комментарий'
         verbose_name_plural = 'Комментарии'
-        ordering = ('-pub_date',)
-
-    def __str__(self):
-        return self.text
 
 
 class Follow(models.Model):
@@ -102,5 +77,18 @@ class Follow(models.Model):
     )
 
     class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'author'],
+                name='unique_follow'
+            ),
+            models.CheckConstraint(
+                check=~models.Q(user=models.F("author")),
+                name='user_and_author_different'
+            )
+        ]
         verbose_name = 'Подписка'
         verbose_name_plural = 'Подписки'
+
+    def __str__(self):
+        return self.user, self.author

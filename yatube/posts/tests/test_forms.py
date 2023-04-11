@@ -7,8 +7,8 @@ from django.conf import settings
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 
-from posts.forms import PostForm
-from posts.models import Post, User, Group
+from posts.forms import PostForm, CommentForm
+from posts.models import Post, User, Group, Comment
 
 TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
 
@@ -117,3 +117,56 @@ class PostFormTest(TestCase):
         )
         new_posts_amount = Post.objects.count()
         self.assertEqual(prev_posts_amount, new_posts_amount)
+
+
+class CommentFormTest(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.user = User.objects.create(username='author')
+        cls.group = Group.objects.create(
+            title='Тестовая группа',
+            slug='test_slug',
+            description='Тестовое описание'
+        )
+        cls.post = Post.objects.create(
+            text='Тестовый пост_',
+            group=cls.group,
+            author=cls.user,
+        )
+        cls.form = CommentForm
+
+    def setUp(self):
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.user)
+
+    def test_authorized_can_add_comments(self):
+        """Проверяет что авторизованный пользователь
+        может оставить комментарий"""
+        Comment.objects.all().delete()
+        form_data = {
+            'text': 'Крутой комментарий!',
+        }
+        prev_comments_count = Comment.objects.count()
+        self.authorized_client.post(
+            reverse('posts:add_comment', args=(self.post.pk,)),
+            data=form_data,
+            follow=True
+        )
+        self.assertEqual(Comment.objects.count(), prev_comments_count + 1)
+        comment = Comment.objects.first()
+        self.assertEqual(comment.text, form_data.get('text'))
+
+    def test_guest_can_not_add_comments(self):
+        """Проверяет что гостевой пользователь
+        не может добавлять комментарии"""
+        form_data = {
+            'text': 'Крутой комментарий 2!',
+        }
+        prev_comments_count = Comment.objects.count()
+        self.client.post(
+            reverse('posts:add_comment', args=(self.post.pk,)),
+            data=form_data,
+            follow=True
+        )
+        self.assertEqual(Comment.objects.count(), prev_comments_count)

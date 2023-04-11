@@ -32,7 +32,9 @@ def profile(request, username):
     author = get_object_or_404(User, username=username)
     posts = author.posts.select_related('group').all()
     posts_count = posts.count()
-    if request.user.is_authenticated:
+    # без этой проверки тесты кидают эррор
+    # TypeError: 'AnonymousUser' object is not iterable
+    if request.user.is_authenticated and author != request.user:
         following = Follow.objects.filter(
             user=request.user,
             author=author
@@ -50,12 +52,18 @@ def profile(request, username):
 
 
 def post_detail(request, post_id):
-    post = get_object_or_404(Post, pk=post_id)
-    comments = Comment.objects.filter(post=post)
+    # был бы очень благодарен, если бы вы пояснили почему делаем именно
+    # такую выборку по автору потом по comments__author или что именно
+    # я сделал неправильно если это неверно
+    post = get_object_or_404(Post
+                             .objects
+                             .select_related('author')
+                             .prefetch_related('comments__author'),
+                             pk=post_id)
     context = {
         'post': post,
         'form': CommentForm(),
-        'comments': comments,
+        'comments': post.comments.all(),
     }
     return render(request, 'posts/post_detail.html', context)
 
@@ -104,8 +112,10 @@ def add_comment(request, post_id):
 
 @login_required
 def follow_index(request):
-    post_ids = request.user.follower.values_list('author__posts', flat=True)
-    posts = Post.objects.filter(id__in=post_ids).all()
+    posts = (Post
+             .objects
+             .select_related('author', 'group')
+             .filter(author__following__user=request.user))
     page_obj = paginate(request, posts)
     context = {
         'page_obj': page_obj
@@ -118,7 +128,7 @@ def profile_follow(request, username):
     author = get_object_or_404(User, username=username)
     follows = request.user.follower.values_list('author', flat=True)
     if request.user != author and author.pk not in follows:
-        Follow.objects.create(
+        Follow.objects.get_or_create(
             user=request.user,
             author=author,
         )
@@ -127,10 +137,7 @@ def profile_follow(request, username):
 
 @login_required
 def profile_unfollow(request, username):
-    author = get_object_or_404(User, username=username)
-    if request.user != author:
-        Follow.objects.filter(
-            user=request.user,
-            author=author
-        ).delete()
-    return redirect('posts:profile', author)
+    get_object_or_404(Follow,
+                      user=request.user,
+                      author__username=username).delete()
+    return redirect('posts:profile', username)

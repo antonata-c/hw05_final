@@ -45,6 +45,6 @@
         <a href="{% url 'posts:post_edit' post.pk %}">Редактировать &#9998; </a>
       {% endif %}
     </div>
-    {% include 'posts/comments.html' %}
+    {% include 'posts/includes/comments.html' %}
   </div>
 {% endblock %}

@@ -5,24 +5,31 @@
 {% load thumbnail %}
 {% block content %}
   <div class="container py-5">
-     <div class="mb-5">
+    <div class="mb-5">
       <h1>Все посты пользователя {{ author.get_full_name }}</h1>
-      <h3>Всего постов: {{ posts_count }}</h3>
-      {% if following %}
-        <a
-          class="btn btn-lg btn-light"
-          href="{% url 'posts:profile_unfollow' author.username %}" role="button"
-        >
-          Отписаться
-        </a>
-      {% else %}
+      <ul class="list-group list-group-horizontal">
+        <li class="list-group-item">Всего постов: {{ posts_count }}</li>
+        <li class="list-group-item">Подписчиков: {{ author.following.count }}</li>
+        <li class="list-group-item">Подписок: {{ author.follower.count }}</li>
+      </ul>
+      <br>
+      {% if user.is_authenticated %}
+        {% if following %}
+          <a
+            class="btn btn-lg btn-light"
+            href="{% url 'posts:profile_unfollow' author.username %}" role="button"
+          >
+            Отписаться
+          </a>
+        {% else %}
           <a
             class="btn btn-lg btn-primary"
             href="{% url 'posts:profile_follow' author.username %}" role="button"
           >
             Подписаться
           </a>
-       {% endif %}
+        {% endif %}
+      {% endif %}
     </div>
     {% for post in page_obj %}
       {% include 'posts/includes/post_card.html' with profile_flag=True %}

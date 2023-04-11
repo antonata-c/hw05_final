@@ -5,9 +5,9 @@
 {% block content %}
   <div class="container py-5">
     <h1>Посты избранных авторов</h1>
+    {% include 'posts/includes/switcher.html' with follow=True %}
     {% load cache %}
     {% cache 20 follow_page page_obj %}
-      {% include 'posts/includes/switcher.html' %}
       {% for post in page_obj %}
         {% include 'posts/includes/post_card.html' %}
         {% if not forloop.last %}

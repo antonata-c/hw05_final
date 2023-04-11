@@ -4,7 +4,7 @@ from django.core.cache import cache
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from posts.models import Post, Group, User, Comment, Follow
+from posts.models import Post, Group, User, Follow
 from posts.forms import PostForm
 
 
@@ -12,7 +12,9 @@ class PostPagesTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.author = User.objects.create_user(username='author')
+        cls.user = User.objects.create_user(username='Пользователь')
+        cls.author = User.objects.create_user(username='Супер автор')
+        cls.author_2 = User.objects.create_user(username='Не подписываемся')
         cls.group = Group.objects.create(
             title='Тестовая группа',
             slug='test_slug',
@@ -23,15 +25,16 @@ class PostPagesTests(TestCase):
             text='Тестовый пост',
             group=cls.group,
         )
-        cls.comment = Comment.objects.create(
-            post=cls.post,
-            author=cls.author,
-            text='Мой коммент'
+        cls.follow = Follow.objects.create(
+            user=cls.user,
+            author=cls.author
         )
 
     def setUp(self):
         self.author_client = Client()
         self.author_client.force_login(self.author)
+        self.user_client = Client()
+        self.user_client.force_login(self.user)
 
     def context_tester(self, response, post_check=False):
         """Служебная функция для тестов контекстов"""
@@ -44,6 +47,13 @@ class PostPagesTests(TestCase):
         self.assertEqual(post.author, self.post.author)
         self.assertEqual(post.pub_date, self.post.pub_date)
         self.assertEqual(post.image, self.post.image)
+
+    # def count_following_posts(self):
+    #     posts_count = (Post
+    #                    .objects
+    #                    .select_related('author', 'group')
+    #                    .filter(author__following__user=self.user).count())
+    #     return posts_count
 
     def test_index_page_has_correct_context(self):
         """Проверяем контекст главной страницы"""
@@ -77,6 +87,7 @@ class PostPagesTests(TestCase):
         form_fields = {
             'text': forms.fields.CharField,
             'group': forms.models.ModelChoiceField,
+            'image': forms.fields.ImageField,
         }
         for url, args in post_page_requests:
             with self.subTest(url=reverse(url, args=args)):
@@ -110,76 +121,53 @@ class PostPagesTests(TestCase):
             args=(self.group.slug,)))
         self.assertContains(old_group_response, self.post)
 
-    def test_comment_appeared_at_post_detail(self):
-        """Проверяет что комментарий появился на странице поста"""
-        response = self.client.get(reverse('posts:post_detail',
-                                           args=(self.post.pk,)))
-        # Тут я так и не понял, нужно было делать тест формы и отправлять
-        # комментарий через .post ? или все таки как я сделал
-        self.assertIn(self.comment, response.context.get('comments'))
-
-
-class PaginatorViewsTest(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.author = User.objects.create_user(username='new_author')
-        cls.group = Group.objects.create(
-            title='Тестовая группа 2',
-            slug='test_slug',
-            description='Тестовое описание'
+    def test_authorized_client_can_follow(self):
+        """Проверяет что авторизованный клиент может подписаться"""
+        Follow.objects.all().delete()
+        self.user_client.get(
+            reverse('posts:profile_follow', args=(self.author,))
         )
-        cls.POSTS_SHOW_REMAINING = 3
-        for post_number in range(settings.POSTS_SHOW_AMOUNT
-                                 + cls.POSTS_SHOW_REMAINING):
-            Post.objects.create(
-                text=f'Тестовый пост {post_number}',
-                author=cls.author,
-                group=cls.group,
-            )
+        self.assertEqual(Follow.objects.all().count(), 1)
+        follow = Follow.objects.first()
+        self.assertEqual(follow.user, self.user)
+        self.assertEqual(follow.author, self.author)
 
-    def setUp(self):
-        self.author_client = Client()
-        self.author_client.force_login(self.author)
-
-    def test_pages_contains_correct_amount_of_posts(self):
-        """Проверяем что на странице правильное количество постов"""
-        url_names_with_args = (
-            ('posts:index', None),
-            ('posts:profile', (self.author,)),
-            ('posts:group_list', (self.group.slug,))
+    def test_authorized_client_can_unfollow(self):
+        """Проверяет что авторизованный клиент может отписаться"""
+        self.assertEqual(Follow.objects.all().count(), 1)
+        self.user_client.get(
+            reverse('posts:profile_unfollow', args=(self.author,))
         )
-        pages_with_posts_amount = (
-            ('?page=1', settings.POSTS_SHOW_AMOUNT),
-            ('?page=2', self.POSTS_SHOW_REMAINING),
-        )
-        for url, args in url_names_with_args:
-            with self.subTest(url=url):
-                for page, posts_amount in pages_with_posts_amount:
-                    with self.subTest(page=page):
-                        response = self.author_client.get(reverse(
-                            url, args=args) + page)
-                        self.assertEqual(len(response.context.get(
-                            'page_obj')), posts_amount)
+        self.assertEqual(Follow.objects.all().count(), 0)
 
+    def test_new_post_appears_at_followed_profile(self):
+        """Проверяет что пост появляется в постах подписок"""
+        response = self.user_client.get(reverse('posts:follow_index'))
+        self.context_tester(response)
 
-class CachePostTest(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.author = User.objects.create_user(username='лучший')
-        cls.group = Group.objects.create(
-            title='Тестовая группа 3',
-            slug='test_slug',
-            description='Тестовое описание'
-        )
-        cls.post = Post.objects.create(
-            text='Очень тестовый пост',
-            author=cls.author,
-            group=cls.group,
-        )
+    def test_new_posts_not_appeared_at_follows(self):
+        """Проверяет что пост не появляется в постах подписок"""
+        response = self.author_client.get(reverse('posts:follow_index'))
+        self.assertEqual(len(response.context.get('page_obj')), 0)
 
-    def test_cache_posts_index_page(self):
+    def test_double_follow(self):
+        Follow.objects.all().delete()
+        self.user_client.get(
+            reverse('posts:profile_follow', args=(self.author,))
+        )
+        self.user_client.get(
+            reverse('posts:profile_follow', args=(self.author,))
+        )
+        self.assertEqual(Follow.objects.all().count(), 1)
+
+    def test_follow_user_on_user(self):
+        Follow.objects.all().delete()
+        self.user_client.get(
+            reverse('posts:profile_follow', args=(self.user,))
+        )
+        self.assertEqual(Follow.objects.all().count(), 0)
+
+    def test_z_cache_posts_index_page(self):
         """Проверяет кэширование главной страницы"""
         content_first = self.client.get(reverse('posts:index')).content
 
@@ -194,74 +182,51 @@ class CachePostTest(TestCase):
         self.assertNotEqual(content_second, content_last)
 
 
-class FollowTest(TestCase):
+class PaginatorViewsTest(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.user = User.objects.create_user(username='Пользователь')
-        cls.author = User.objects.create_user(username='Супер автор')
-        cls.author_2 = User.objects.create_user(username='Не подписываемся')
+        cls.user = User.objects.create_user(username='new_follower')
+        cls.author = User.objects.create_user(username='new_author')
         cls.group = Group.objects.create(
-            title='Тестовая группа 4',
+            title='Тестовая группа 2',
             slug='test_slug',
             description='Тестовое описание'
         )
-        cls.post = Post.objects.create(
-            text='Очень тестовый пост 2',
-            author=cls.author,
-            group=cls.group,
-        )
-        cls.follow = Follow.objects.create(
+        cls.follower = Follow.objects.create(
             user=cls.user,
-            author=cls.author
+            author=cls.author,
         )
+        cls.POSTS_SHOW_REMAINING = 3
+        for post_number in range(settings.POSTS_SHOW_AMOUNT
+                                 + cls.POSTS_SHOW_REMAINING):
+            Post.objects.create(
+                text=f'Тестовый пост {post_number}',
+                author=cls.author,
+                group=cls.group,
+            )
 
     def setUp(self):
-        self.authorized_client = Client()
-        self.authorized_client.force_login(self.user)
+        self.follower_client = Client()
+        self.follower_client.force_login(self.user)
 
-    def count_following_posts(self):
-        post_ids = self.user.follower.values_list('author__posts', flat=True)
-        following_posts_before = (Post
-                                  .objects
-                                  .filter(id__in=post_ids)
-                                  .all()
-                                  .count())
-        return following_posts_before
-
-    # сначала думал что это нужно сделать в test_urls, но решил вот тут
-    def test_authorized_client_can_follow(self):
-        """Проверяет что авторизованный клиент может подписаться"""
-        Follow.objects.all().delete()
-        self.authorized_client.get(
-            reverse('posts:profile_follow', args=(self.author,))
+    def test_pages_contains_correct_amount_of_posts(self):
+        """Проверяем что на странице правильное количество постов"""
+        url_names_with_args = (
+            ('posts:index', None),
+            ('posts:profile', (self.author,)),
+            ('posts:group_list', (self.group.slug,)),
+            ('posts:follow_index', None)
         )
-        self.assertEqual(Follow.objects.all().count(), 1)
-
-    def test_authorized_client_can_unfollow(self):
-        """Проверяет что авторизованный клиент может отписаться"""
-        self.assertEqual(Follow.objects.all().count(), 1)
-        self.authorized_client.get(
-            reverse('posts:profile_unfollow', args=(self.author,))
+        pages_with_posts_amount = (
+            ('?page=1', settings.POSTS_SHOW_AMOUNT),
+            ('?page=2', self.POSTS_SHOW_REMAINING),
         )
-        self.assertEqual(Follow.objects.all().count(), 0)
-
-    def test_new_post_appears_at_followed_profile(self):
-        followings_first_follow = self.count_following_posts()
-        Post.objects.create(
-            text='Подписываемся',
-            author=self.author,
-            group=self.group,
-        )
-        followings_second_follow = self.count_following_posts()
-        self.assertEqual(followings_first_follow + 1, followings_second_follow)
-
-        followings_first_not_follow = self.count_following_posts()
-        Post.objects.create(
-            text='Не подписываемся',
-            author=self.author_2,
-            group=self.group,
-        )
-        followings_second_not_follow = self.count_following_posts()
-        self.assertEqual(followings_first_not_follow,
-                         followings_second_not_follow)
+        for url, args in url_names_with_args:
+            with self.subTest(url=url):
+                for page, posts_amount in pages_with_posts_amount:
+                    with self.subTest(page=page):
+                        response = self.follower_client.get(reverse(
+                            url, args=args) + page)
+                        self.assertEqual(len(response.context.get(
+                            'page_obj')), posts_amount)

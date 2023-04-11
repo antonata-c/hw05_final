@@ -3,7 +3,7 @@ from http import HTTPStatus
 from django.test import TestCase, Client
 from django.urls import reverse
 
-from posts.models import Post, Group, User
+from posts.models import Post, Group, User, Follow
 
 
 class PostURLTests(TestCase):
@@ -12,6 +12,7 @@ class PostURLTests(TestCase):
         super().setUpClass()
         cls.author = User.objects.create_user(username='author')
         cls.user = User.objects.create_user(username='test')
+        cls.following_author = User.objects.create_user(username='following')
         cls.group = Group.objects.create(
             title='Тестовая группа',
             slug='test_slug',
@@ -34,6 +35,19 @@ class PostURLTests(TestCase):
              '/create/'),
             ('posts:post_edit', (cls.post.pk,),
              f'/posts/{cls.post.pk}/edit/'),
+            ('posts:add_comment', (cls.post.pk,),
+             f'/posts/{cls.post.pk}/comment/'),
+            ('posts:profile_follow', (cls.following_author,),
+             f'/profile/{cls.following_author}/follow/'),
+            ('posts:profile_unfollow', (cls.following_author,),
+             f'/profile/{cls.following_author}/unfollow/'),
+            ('posts:follow_index', None,
+             f'/follow/')
+        )
+        cls.redirects = (
+            'posts:profile_follow',
+            'posts:profile_unfollow',
+            'posts:add_comment',
         )
 
     def setUp(self):
@@ -63,6 +77,8 @@ class PostURLTests(TestCase):
              'posts/post_create_and_edit.html'),
             ('posts:post_edit', (self.post.pk,),
              'posts/post_create_and_edit.html'),
+            ('posts:follow_index', None,
+             'posts/follow.html'),
         )
         for name, args, template in template_url_names:
             with self.subTest(address=reverse(name, args=args)):
@@ -74,7 +90,10 @@ class PostURLTests(TestCase):
         for name, args, template in self.reverse_url_names:
             with self.subTest(address=reverse(name, args=args)):
                 response = self.author_client.get(reverse(name, args=args))
-                self.assertEqual(response.status_code, HTTPStatus.OK)
+                if name in self.redirects:
+                    self.assertEqual(response.status_code, HTTPStatus.FOUND)
+                else:
+                    self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_urls_access_for_authorized_client(self):
         """Проверяем доступ клиента вошедшего в аккаунт"""
@@ -85,6 +104,8 @@ class PostURLTests(TestCase):
                 if name == 'posts:post_edit':
                     self.assertRedirects(response, reverse(
                         'posts:post_detail', args=args))
+                elif name in self.redirects:
+                    self.assertEqual(response.status_code, HTTPStatus.FOUND)
                 else:
                     self.assertEqual(response.status_code, HTTPStatus.OK)
 
@@ -95,7 +116,8 @@ class PostURLTests(TestCase):
                                'posts:post_create',
                                'posts:add_comment',
                                'posts:profile_follow',
-                               'posts:profile_unfollow',)
+                               'posts:profile_unfollow',
+                               'posts:follow_index')
         for name, args, template in self.reverse_url_names:
             reverse_name = reverse(name, args=args)
             with self.subTest(address=reverse_name):
