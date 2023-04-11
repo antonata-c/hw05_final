@@ -3,7 +3,7 @@ from http import HTTPStatus
 from django.test import TestCase, Client
 from django.urls import reverse
 
-from posts.models import Post, Group, User, Follow
+from posts.models import Post, Group, User
 
 
 class PostURLTests(TestCase):
@@ -42,7 +42,7 @@ class PostURLTests(TestCase):
             ('posts:profile_unfollow', (cls.following_author,),
              f'/profile/{cls.following_author}/unfollow/'),
             ('posts:follow_index', None,
-             f'/follow/')
+             '/follow/')
         )
         cls.redirects = (
             'posts:profile_follow',

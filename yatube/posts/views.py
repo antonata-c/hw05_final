@@ -2,7 +2,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, render, redirect
 
 from .forms import PostForm, CommentForm
-from .models import Group, Post, User, Comment, Follow
+from .models import Group, Post, User, Follow
 from .utils import paginate
 
 
