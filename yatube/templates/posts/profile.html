@@ -12,24 +12,24 @@
         <li class="list-group-item">Подписчиков: {{ author.following.count }}</li>
         <li class="list-group-item">Подписок: {{ author.follower.count }}</li>
       </ul>
-      <br>
-      {% if user.is_authenticated %}
-        {% if following %}
-          <a
-            class="btn btn-lg btn-light"
-            href="{% url 'posts:profile_unfollow' author.username %}" role="button"
-          >
-            Отписаться
-          </a>
-        {% else %}
-          <a
-            class="btn btn-lg btn-primary"
-            href="{% url 'posts:profile_follow' author.username %}" role="button"
-          >
-            Подписаться
-          </a>
+        {% if user.is_authenticated and user != author %}
+          <br>
+          {% if following %}
+            <a
+              class="btn btn-lg btn-light"
+              href="{% url 'posts:profile_unfollow' author.username %}" role="button"
+            >
+              Отписаться
+            </a>
+          {% else %}
+            <a
+              class="btn btn-lg btn-primary"
+              href="{% url 'posts:profile_follow' author.username %}" role="button"
+            >
+              Подписаться
+            </a>
+          {% endif %}
         {% endif %}
-      {% endif %}
     </div>
     {% for post in page_obj %}
       {% include 'posts/includes/post_card.html' with profile_flag=True %}

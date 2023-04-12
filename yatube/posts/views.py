@@ -32,15 +32,12 @@ def profile(request, username):
     author = get_object_or_404(User, username=username)
     posts = author.posts.select_related('group').all()
     posts_count = posts.count()
-    # без этой проверки тесты кидают эррор
-    # TypeError: 'AnonymousUser' object is not iterable
-    if request.user.is_authenticated and author != request.user:
-        following = Follow.objects.filter(
-            user=request.user,
-            author=author
-        ).exists()
-    else:
-        following = False
+    following = (request.user.is_authenticated
+                 and request.user != author
+                 and Follow.objects.filter(
+                    user=request.user,
+                    author=author
+                 ).exists())
     page_obj = paginate(request, posts)
     context = {
         'author': author,
@@ -126,8 +123,7 @@ def follow_index(request):
 @login_required
 def profile_follow(request, username):
     author = get_object_or_404(User, username=username)
-    follows = request.user.follower.values_list('author', flat=True)
-    if request.user != author and author.pk not in follows:
+    if request.user != author:
         Follow.objects.get_or_create(
             user=request.user,
             author=author,

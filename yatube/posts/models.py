@@ -48,7 +48,6 @@ class Comment(PubDateModel):
     post = models.ForeignKey(
         Post,
         on_delete=models.CASCADE,
-        related_name='comments',
         verbose_name='Пост комментария',
         help_text='Пост, на котором будет оставлен комментарий'
     )
@@ -90,4 +89,4 @@ class Follow(models.Model):
         verbose_name_plural = 'Подписки'
 
     def __str__(self):
-        return self.user, self.author
+        return f"{self.user} подписан на {self.author}"

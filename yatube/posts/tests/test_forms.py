@@ -156,6 +156,8 @@ class CommentFormTest(TestCase):
         self.assertEqual(Comment.objects.count(), prev_comments_count + 1)
         comment = Comment.objects.first()
         self.assertEqual(comment.text, form_data.get('text'))
+        self.assertEqual(comment.post, self.post)
+        self.assertEqual(comment.author, self.user)
 
     def test_guest_can_not_add_comments(self):
         """Проверяет что гостевой пользователь

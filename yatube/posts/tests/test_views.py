@@ -1,13 +1,29 @@
+import shutil
+import tempfile
+
 from django import forms
 from django.conf import settings
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.cache import cache
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from posts.models import Post, Group, User, Follow
 from posts.forms import PostForm
 
+TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
 
+small_pic = (
+    b'\x47\x49\x46\x38\x39\x61\x02\x00'
+    b'\x01\x00\x80\x00\x00\x00\x00\x00'
+    b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+    b'\x00\x00\x00\x2C\x00\x00\x00\x00'
+    b'\x02\x00\x01\x00\x00\x02\x02\x0C'
+    b'\x0A\x00\x3B'
+)
+
+
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
 class PostPagesTests(TestCase):
     @classmethod
     def setUpClass(cls):
@@ -20,15 +36,26 @@ class PostPagesTests(TestCase):
             slug='test_slug',
             description='Тестовое описание'
         )
+        cls.image = SimpleUploadedFile(
+            name='small.png',
+            content=small_pic,
+            content_type='posts/small.png'
+        )
         cls.post = Post.objects.create(
             author=cls.author,
             text='Тестовый пост',
             group=cls.group,
+            image=cls.image,
         )
         cls.follow = Follow.objects.create(
             user=cls.user,
             author=cls.author
         )
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
 
     def setUp(self):
         self.author_client = Client()
@@ -47,13 +74,6 @@ class PostPagesTests(TestCase):
         self.assertEqual(post.author, self.post.author)
         self.assertEqual(post.pub_date, self.post.pub_date)
         self.assertEqual(post.image, self.post.image)
-
-    # def count_following_posts(self):
-    #     posts_count = (Post
-    #                    .objects
-    #                    .select_related('author', 'group')
-    #                    .filter(author__following__user=self.user).count())
-    #     return posts_count
 
     def test_index_page_has_correct_context(self):
         """Проверяем контекст главной страницы"""
@@ -151,6 +171,7 @@ class PostPagesTests(TestCase):
         self.assertEqual(len(response.context.get('page_obj')), 0)
 
     def test_double_follow(self):
+        """Проверяет, что нельзя подписаться на автора многократно"""
         Follow.objects.all().delete()
         self.user_client.get(
             reverse('posts:profile_follow', args=(self.author,))
