@@ -1,18 +1,22 @@
 # Yatube
 ### Описание
-Данный проект представляет собой социальную сеть Yatube
+Данный проект представляет собой социальную сеть Yatube, в которой можно выкладывать свои посты и комментировать посты других пользователей
 ### Технологии
-Python 3.9
-Django 2.2.19
+* Python 3.9
+* Django 2.2.19
 ### Запуск проекта в dev-режиме
 - Установите и активируйте виртуальное окружение
+```
+python3 -m venv venv
+source venv/bin/activate
+```
 - Установите зависимости из файла requirements.txt
 ```
 pip install -r requirements.txt
 ``` 
-- В папке с файлом manage.py выполните команду:
+- В директории с файлом manage.py выполните команду:
 ```
-python3 manage.py runserver
+python manage.py runserver
 ```
 ### Автор
-Антон Земцов
+[Антон Земцов](https://github.com/antonata-c)
